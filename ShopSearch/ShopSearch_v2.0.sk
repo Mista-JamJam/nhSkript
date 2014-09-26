@@ -4,7 +4,7 @@
 # By HoneyBuzzard & nfell2009
 # © nhSkript - nfell2009 & HoneyBuzzard
 # Please note: the converter requires ShopSearch_v1.4 for a full conversion
-# DO NOT REDISTRIBUTE THIS CODE WITHOUT PERMISSION!
+# Do NOT redistrubute this code! For more info see: http://nfell2009.uk/shopsearch/no-to-sharing
 
 options:
 	P: &8[&aSS&8]&a
@@ -15,6 +15,7 @@ options:
 	CE-Command-Check2: false
 	CE-Command-Add: false
 	QuickShop: false
+	B-C: false
 
 on script load:
 	if {ss::setting::converted} is not true:
@@ -40,7 +41,7 @@ on script load:
 				set {ss::player::%uuid of loop-value%::exists} to true
 				set {ss::player::%uuid of loop-value%::buying} to false
 				set {ss::player::%uuid of loop-value%::last-player} to {ss.%uuid of loop-value%.lastplayer}
-				add loop-value to {ss::setting::playerlist::*}
+				set {ss::setting::playerlist::%player%} to player
 		loop {ss.itemlist-itm::*}:
 			set {ss::stats::itm::%loop-value%} to loop-value
 			set {ss::stats::num::%loop-value%} to {ss.itemlist-num::%loop-value%}
@@ -50,12 +51,135 @@ on script load:
 	if {ss::settings::cga-key} is not set:
 		execute console command "/codegenapi g k shopsearch_v2.0"
 		set {ss::settings::cga-key} to {cga.shopsearch_v2.0.code}
+		
+on script load:
+	set {ss::setting::currency} to "£"
+	
+on join:
+	if {ss::player::%uuid of player%::exists} is not set:
+		set {ss::player::%uuid of player%::exists} to true
+		set {ss::player::%uuid of player%::buying} to false
+	if {ss::player::%uuid of player%::lastplayer} is not set:
+		set {ss::player::%uuid of player%::lastplayer} to player
+	if {ss::setting::playerlist::%player%} is not set:
+		set {ss::setting::playerlist::%player%} to player
+	if {ss::player::%uuid of player%::lastplayer} is not player:
+		set {_p} to {ss::player::%uuid of player%::lastplayer} parsed as player
+		loop {ss::player::%uuid of player%chests::*}:
+			set {_loc} to loop-value
+			add 1 to y coord of {_loc}
+			set line 1 of block at {_loc} to "%player%"
 				
 command /shopsearch [<text>] [<text>] [<text>] [<text>]:
 	permission: ss.admin
 	trigger:
 		if arg 1 is not set:
 			message "{@P} Do /ss help - for help"
+		else if arg 1 is "menu":
+			if arg 2 is set:
+				set {_p} to arg 2 parsed as player
+				set {_u} to uuid of {_p}
+				set {_size} to rounded up size of {ss::player::%{_u}%::chests::*} / 9
+				open chest with {_size} rows named "&aShop of: %{_p}%" to player
+				wait 1 tick
+				set {_num} to -3
+				loop {ss::player::%{_u}%::chests::*}:
+					add 1 to {_num}
+					set {_loc} to location of block above block at loop-value
+					set {_cloc} to location of block at loop-value
+					set {_b} to block at {_loc}
+					set {_i} to line 4 of {_b} parsed as item
+					set {_a} to line 2 of {_b} parsed as integer
+					if line 1 of {_b} is "[Chest Shop]":
+						set {_owner} to {McCS.Owner.%{_loc}%}
+					else:
+						set {_owner} to line 1 of {_b}
+					if block at {_cloc} contains {_a} of {_i}:
+						if {ss::quickshop::%{_cloc}%} is set:
+							format slot {_num} of player with {_i} named "&aIn stock" with lore "&aPlayer to: %{_owner}%||&aAmount: %line 2 of {_b}%||&aPrice: %line 3 of {_b}%||&aItem: %line 4 of {_b}%||&aQuickShop Code: %{ss::quickshop::%{_cloc}%}%" to close then run "ss-console quickshop %player% %{ss::quickshop::%{_cloc}%}%"
+						else:
+							format slot {_num} of player with {_i} named "&aIn stock" with lore "&aPlayer to: %{McCS.Owner.%{_loc}%}%||&aAmount: %line 2 of {_b}%||&aPrice: %line 3 of {_b}%||&aItem: %line 4 of {_b}%" to close then run "ss-console menu %player% %arg 2% %line 2 of {_b}% %line 3 of {_b}% %line 4 of {_b}% %{_cloc}%"
+					else:
+						format slot {_num} of player with {_i} named "&4Out of stock" with lore "&4Unfortunately this item is currently out of stock!" to be unstealable
+		else if arg 1 is "quickshop":
+			if arg 2 is set:
+				if {ss::quickshop::%arg 2%} is set:
+					set {_c} to arg 2
+					set {_loc} to {ss::quickshop::%{_c}%}
+					add 1 to y coord of {_loc}
+					set {_a} to {ss::quickshop::%{_c}%::amount}
+					set {_i} to {ss::quickshop::%{_c}%::item}
+					set {_p} to {ss::quickshop::%{_c}%::playerto}
+					set {_l3} to {ss::quickshop::%{_c}%::price}
+					message "{@P} Item: %{_i}%"
+					message "{@P} Amount: %{_a}%"
+					message "{@P} Price: %{_l3}%"
+					message "{@P} Buying from: %{_p}%"
+					send json of "{@P} {@Click-Here}Click Here " tooltip "{@P} To confirm your purchase" run "/ss confirm" then "{@Other-Text}to confirm your purchase"
+				else:
+					message "{@P} Invalid code"
+			else:
+				message "{@P} You must provide a code"
+		else if arg 1 is "stats":
+			if arg 2 is "help":
+				message "{@P} Stats help:"
+				message "{@P} /ss stats shops - Lists number of shops"
+				message "{@P} /ss stats money - Total money that has been sent in SS"
+				message "{@P} /ss stats items - Best selling items"
+				message "{@P} /ss ststs users - Most selling users"
+			if arg 2 is "shops":
+				loop {ss::setting::playerlist::*}:
+					add size of {ss::player::%uuid of loop-value%::chests} to {_count}
+				if {_count} is not set:
+					set {_count} to 0
+				message "{@P} There are currently: %{_count}% shops!"
+			else if arg 2 is "money":
+				if {ss::global::totalmoney} is not set:
+					set {ss::global::totalmoney} to 0
+				if {@B-C} is true:
+					message "{@P} A total of: %{ss::setting::currency}%%{ss::global::totalmoney}% has been sent using ShopSearch"
+				else:
+					message "{@P} A total of: %{ss::global::totalmoney}%%{ss::setting::currency}% has been sent using ShopSearch"
+			else if arg 2 is "items":
+				if {ss::stats::itm::*} is empty:
+					message "{@P} There are no top selling items."
+					stop
+				else if {ss::stats::num::*} is empty:
+					message "{@P} There are no top selling items."
+					stop
+				message "{@P} Top selling items:"
+				loop {ss::stats::itm::*}:
+					add 1 to {_num}
+					set {_item-%{_num}%} to {ss::stats::num::%loop-value%}
+					if {_num} = 10:
+						exit
+				loop {ss::stats::itm::*}:
+					loop 10 times:
+						add 1 to {_cou}
+						if {ss.itemlist-num::%loop-value%} > {_item-%{_num}%}:
+							set {_output-list::%{_num}%} to "%loop-value% - %{ss::stats::num::%loop-value%}%"
+				loop {_output-list::*}:
+					message "{@P} %loop-value%"
+			else if arg 2 is "users":
+				if {ss::stats::playersales::p::*} is empty:
+					message "{@P} There are no top selling players."
+					stop
+				else if {ss::stats::playersales::n::*} is empty:
+					message "{@P} There are no top selling players."
+					stop
+				message "{@P} Top selling players:"
+				loop {ss::stats::playersales::p::*}:
+					add 1 to {_num}
+					set {_item-%{_num}%} to {ss::stats::playersales::p::%loop-value%}
+					if {_num} = 10:
+						exit
+				loop {ss::stats::playersales::p::*}:
+					loop 10 times:
+						add 1 to {_cou}
+						if {ss::stats::playersales::n::*} > {_item-%{_num}%}:
+							set {_output-list::%{_num}%} to "%loop-value% - %{ss::stats::playersales::n::%loop-value%}%"
+				loop {_output-list::*}:
+					message "{@P} %loop-value%"
 		else if arg 1 is "add":
 			if arg 2 is not set:
 				set {ss::player::%uuid of player%::setting::add-num} to 1
@@ -303,6 +427,25 @@ command /ss-console [<text>] [<text>] [<text>] [<text>] [<text>]:
 			set {_a} to arg 2 parsed as integer
 			set {_p} to arg 3 parsed as player
 			give {_a} of {_i} to {_p}
+		else if arg 1 is "menu":
+			set {_p} to arg 2 parsed as player
+			set {_u} to uuid of {_p}
+			send "{@P} We're preparing your shopping experience..." to {_p}
+			set {ss.%{_u}%.buying.chestloc} to arg 7
+			set {ss.%{_u}%.buying.playerto} to arg 3
+			set {ss.%{_u}%.buying.amount} to arg 4
+			set {ss.%{_u}%.buying.price} to arg 5
+			set {ss.%{_u}%.buying.item} to arg 6
+			set {ss.%{_u}%.buying} to true
+			make {_p} execute command "/ss buy"
+		else if arg 1 is "quickshop":
+			set {_p} to arg 2 parsed as player
+			set {_c} to arg 3
+			make {_p} execute command "/ss quickshop %{_c}%"
+		else:
+			set {_p} to arg 2 parsed as player
+			message "{@P} There was an error" to {_p}
+			
 				
 
 on rightclick on chest:
